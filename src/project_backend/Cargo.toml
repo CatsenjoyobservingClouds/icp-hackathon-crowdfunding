@@ -1,0 +1,21 @@
+[package]
+name = "project_backend"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+candid = "0.10"
+ic-cdk = "0.17"
+serde = { version = "1.0", features = ["derive"] }
+serde_cbor = "0.11"
+serde_json = "1.0"
+icrc-ledger-types = "0.1.5"
+serde_derive = "1.0.197"
+ic-cdk-timers = "0.6"
+
+
