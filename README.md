@@ -1,4 +1,4 @@
-# `project`
+# `Crowdfunding Platform ICP Hackathon Project`
 
 Welcome to your new `project` project and to the Internet Computer development community. By default, creating a new project adds this README and some template files to your project directory. You can edit these template files to customize your project and to include your own code to speed up the development cycle.
 
