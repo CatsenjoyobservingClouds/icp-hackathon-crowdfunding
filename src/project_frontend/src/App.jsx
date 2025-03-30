@@ -1,125 +1,187 @@
-import React, { useState, useEffect } from "react";
-import { createProject, listProjects, contributeToProject, releaseFunds, claimRefund } from "./service";
+import React, { useState, useEffect } from 'react';
+import './formStyles.css';
+import { Actor, HttpAgent } from '@dfinity/agent';
+import { idlFactory, canisterId } from "../../declarations/project_backend/index";
+import { Principal } from '@dfinity/principal';
 
-const App = () => {
+const agent = new HttpAgent({ host: 'https://icp0.io' });
+
+agent.fetchRootKey().catch((err) => {
+  console.log("Failed to fetch root key", err);
+});
+
+const actor = Actor.createActor(idlFactory, {
+  agent,
+  canisterId: canisterId,
+});
+
+function App() {
   const [projects, setProjects] = useState([]);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [fundingGoal, setFundingGoal] = useState(0);
-  const [durationDays, setDurationDays] = useState(0);
-  const [amountToContribute, setAmountToContribute] = useState(0);
+  const [newProject, setNewProject] = useState({
+    title: '',
+    description: '',
+    fundingGoal: 0,
+    duration: 0,
+  });
+  const [contributionAmount, setContributionAmount] = useState('');
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [userPrincipal, setUserPrincipal] = useState(null);
 
-  const fetchProjects = async () => {
-    try {
-      const result = await listProjects();
-      setProjects(result);
-    } catch (error) {
-      console.error("Error fetching projects:", error);
+  
+    async function fetchProjects() {
+      try {
+        const projectList = await actor.list_projects();
+        const projectsWithConvertedValues = projectList.map(project => ({
+          ...project,
+          fundingGoal: project.funding_goal ? Number(project.fundingGoal.toString()) : 0,  // Convert BigInt to Number
+          duration: project.duration ? Number(project.duration.toString()) : 0,  // Convert BigInt to Number
+        }));
+        console.log(projectsWithConvertedValues)
+        setProjects(projectsWithConvertedValues);
+      } catch (err) {
+        console.error('Error fetching projects:', err);
+      }
     }
-  };
+  
+    useEffect(() => {
+      fetchProjects();  // This should now be defined correctly
+    }, []);
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
 
-  const handleCreateProject = async () => {
     try {
-      const result = await createProject(title, description, fundingGoal, durationDays);
-      console.log("Project Created:", result);
+      const projectId = await actor.create_project(
+        newProject.title,
+        newProject.description,
+        BigInt(newProject.fundingGoal),
+        BigInt(newProject.duration)
+      );
+      console.log(projectId)
+      alert(`Project created with ID: ${projectId.Ok}`);
+      setNewProject({
+        title: '',
+        description: '',
+        fundingGoal: '',
+        duration: '',
+      });
+      
       fetchProjects();
-    } catch (error) {
-      console.error("Error creating project:", error);
+    } catch (err) {
+      console.error('Error creating project:', err);
     }
   };
 
   const handleContribute = async (projectId) => {
     try {
-      const result = await contributeToProject(projectId, amountToContribute);
-      console.log("Contribution Result:", result);
+      await actor.contribute(projectId, contributionAmount);
+      alert(`Successfully contributed ${contributionAmount} to project ${projectId}`);
+      setContributionAmount('');
       fetchProjects();
-    } catch (error) {
-      console.error("Error contributing:", error);
+    } catch (err) {
+      console.error('Error contributing to project:', err);
     }
   };
 
   const handleReleaseFunds = async (projectId) => {
     try {
-      const result = await releaseFunds(projectId);
-      console.log("Funds Released:", result);
+      await actor.release_funds(projectId);
+      alert('Funds released successfully');
       fetchProjects();
-    } catch (error) {
-      console.error("Error releasing funds:", error);
+    } catch (err) {
+      console.error('Error releasing funds:', err);
     }
   };
 
   const handleClaimRefund = async (projectId) => {
     try {
-      const result = await claimRefund(projectId);
-      console.log("Refund Claimed:", result);
+      await actor.claim_refund(projectId);
+      alert('Refund claimed successfully');
       fetchProjects();
-    } catch (error) {
-      console.error("Error claiming refund:", error);
+    } catch (err) {
+      console.error('Error claiming refund:', err);
     }
   };
 
   return (
-    <div>
-      <h1>Crowdfunding Platform</h1>
-      
-      <h2>Create Project</h2>
-      <input
-        type="text"
-        placeholder="Project Title"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-      <input
-        type="text"
-        placeholder="Project Description"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
-      <input
-        type="number"
-        placeholder="Funding Goal"
-        value={fundingGoal}
-        onChange={(e) => setFundingGoal(Number(e.target.value))}
-      />
-      <input
-        type="number"
-        placeholder="Duration (days)"
-        value={durationDays}
-        onChange={(e) => setDurationDays(Number(e.target.value))}
-      />
-      <button onClick={handleCreateProject}>Create Project</button>
+    <div className="App">
+      <h1>ICP Crowdfunding</h1>
 
-      <h2>Projects</h2>
-      <ul>
-        {projects.map((project) => (
-          <li key={project.id}>
-            <h3>{project.title}</h3>
-            <p>{project.description}</p>
-            <p>Funding Goal: {project.funding_goal} Tokens</p>
-            <p>Current Amount: {project.current_amount} Tokens</p>
-            <p>Status: {project.status}</p>
+      {/* Project Creation Form */}
+      <div className="form-container">
+        <h2>Create New Project</h2>
+        <form onSubmit={handleCreateProject}>
+          <div>
+            <label>Title</label>
+            <input
+              type="text"
+              value={newProject.title}
+              onChange={(e) => setNewProject({ ...newProject, title: e.target.value })}
+            />
+          </div>
+          <div>
+            <label>Description</label>
+            <textarea
+              value={newProject.description}
+              onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+            />
+          </div>
+          <div>
+            <label>Funding Goal</label>
             <input
               type="number"
-              placeholder="Amount to Contribute"
-              value={amountToContribute}
-              onChange={(e) => setAmountToContribute(Number(e.target.value))}
+              value={newProject.fundingGoal}
+              onChange={(e) => setNewProject({ ...newProject, fundingGoal: e.target.value })}
             />
-            <button onClick={() => handleContribute(project.id)}>Contribute</button>
-            {project.status === "Funded" && (
-              <button onClick={() => handleReleaseFunds(project.id)}>Release Funds</button>
-            )}
-            {project.status === "Expired" && (
-              <button onClick={() => handleClaimRefund(project.id)}>Claim Refund</button>
-            )}
-          </li>
-        ))}
-      </ul>
+          </div>
+          <div>
+            <label>Duration (Days)</label>
+            <input
+              type="number"
+              value={newProject.duration}
+              onChange={(e) => setNewProject({ ...newProject, duration: e.target.value })}
+            />
+          </div>
+          <button type="submit">Create Project</button>
+        </form>
+      </div>
+
+      {/* Projects List */}
+      <h2>Active Projects</h2>
+      {projects.length > 0 ? (
+        <ul>
+          {projects.map((project) => (
+            <li key={project.id}>
+              <h3>{project.title}</h3>
+              <p>{project.description}</p>
+              <p>
+                Funding Goal: {project.funding_goal} | Current Amount: {project.current_amount} | Deadline: {new Date(project.deadline / 1000000).toLocaleString()}
+              </p>
+              {project.status === 'Active' && (
+                <div>
+                  <input
+                    type="number"
+                    placeholder="Contribution Amount"
+                    value={contributionAmount}
+                    onChange={(e) => setContributionAmount(e.target.value)}
+                  />
+                  <button onClick={() => handleContribute(project.id)}>Contribute</button>
+                </div>
+              )}
+              {project.status === 'Funded' && project.owner === userPrincipal && (
+                <button onClick={() => handleReleaseFunds(project.id)}>Release Funds</button>
+              )}
+              {project.status === 'Expired' && (
+                <button onClick={() => handleClaimRefund(project.id)}>Claim Refund</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>No projects available.</p>
+      )}
     </div>
   );
-};
+}
 
 export default App;
